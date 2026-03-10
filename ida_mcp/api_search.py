@@ -16,67 +16,36 @@ from .utils import parse_address, hex_addr
 # IDA modules
 import idaapi  # type: ignore
 import idautils  # type: ignore
-import ida_bytes  # type: ignore
-import ida_search  # type: ignore
 import ida_funcs  # type: ignore
 import ida_name  # type: ignore
-import ida_ida  # type: ignore
+
+
+def _resolve_addr(query: str):
+    """Resolve address from hex string or IDA name. Returns (ea, error_str)."""
+    parsed = parse_address(query)
+    if parsed["ok"] and parsed["value"] is not None:
+        return parsed["value"], None
+    try:
+        ea = idaapi.get_name_ea(idaapi.BADADDR, query)
+        if ea != idaapi.BADADDR:
+            return ea, None
+    except Exception:
+        pass
+    return None, f"Cannot resolve: {query}"
 
 
 # ============================================================================
 # Unified Search
 # ============================================================================
 
-def _get_min_ea() -> int:
-    """Get minimum IDB address."""
-    try:
-        return ida_ida.inf_get_min_ea()  # type: ignore
-    except Exception:
-        try:
-            return idaapi.cvar.inf.min_ea  # type: ignore
-        except Exception:
-            return 0
-
-def _get_max_ea() -> int:
-    """Get maximum IDB address."""
-    try:
-        return ida_ida.inf_get_max_ea()  # type: ignore
-    except Exception:
-        try:
-            return idaapi.cvar.inf.max_ea  # type: ignore
-        except Exception:
-            return 0xFFFFFFFFFFFFFFFF
-
-def _bin_search(start: int, end: int, data: bytes) -> int:
-    """Binary search for exact bytes, compatible across IDA versions."""
-    mask = b"\xff" * len(data)
-    try:
-        # IDA 9.x
-        return idaapi.bin_search(
-            start, end, data, mask,
-            idaapi.BIN_SEARCH_FORWARD | idaapi.BIN_SEARCH_NOBREAK,
-        )
-    except Exception:
-        pass
-    try:
-        # IDA 8.x ida_bytes
-        return ida_bytes.bin_search(
-            start, end, data, mask,
-            ida_bytes.BIN_SEARCH_FORWARD | ida_bytes.BIN_SEARCH_NOBREAK,
-        )
-    except Exception:
-        pass
-    return idaapi.BADADDR
-
-
 @tool
 @idaread
 def find(
-    type: Annotated[str, "Search type: 'string', 'immediate', 'data_ref', or 'code_ref'"],
-    target: Annotated[str, "Search target (string to find, integer value, or address)"],
+    type: Annotated[str, "Search type: 'immediate', 'data_ref', or 'code_ref'"],
+    target: Annotated[str, "Search target (integer value or address)"],
     limit: Annotated[int, "Max matches (default: 100, max: 10000)"] = 100,
 ) -> dict:
-    """Search for patterns in the binary (strings, immediate values, or references)."""
+    """Search for patterns in the binary (immediate values or references). Use find_regex for string search."""
     if limit <= 0 or limit > 10000:
         limit = 10000
 
@@ -84,29 +53,7 @@ def find(
     matches: List[dict] = []
     truncated = False
 
-    if search_type == "string":
-        # Search for UTF-8 byte pattern in the binary
-        pattern_bytes = target.encode("utf-8")
-        if not pattern_bytes:
-            return {"type": search_type, "query": target, "matches": [], "total": 0, "error": "Empty pattern"}
-
-        ea = _get_min_ea()
-        max_ea = _get_max_ea()
-        while ea != idaapi.BADADDR and len(matches) < limit:
-            ea = _bin_search(ea, max_ea, pattern_bytes)
-            if ea == idaapi.BADADDR:
-                break
-            entry: dict = {"ea": hex_addr(ea)}
-            func = idaapi.get_func(ea)
-            if func:
-                entry["function"] = ida_funcs.get_func_name(func.start_ea)
-            matches.append(entry)
-            ea += 1
-
-        if len(matches) >= limit:
-            truncated = True
-
-    elif search_type == "immediate":
+    if search_type == "immediate":
         # Search for immediate value in instructions
         try:
             value = int(target, 0)
@@ -146,11 +93,11 @@ def find(
 
     elif search_type in ("data_ref", "code_ref"):
         # Search for references to an address
-        parsed = parse_address(target)
-        if not parsed["ok"] or parsed["value"] is None:
-            return {"type": search_type, "query": target, "matches": [], "total": 0, "error": f"Cannot resolve: {target}"}
+        ea_resolved, err = _resolve_addr(target)
+        if ea_resolved is None:
+            return {"type": search_type, "query": target, "matches": [], "total": 0, "error": err}
 
-        target_ea = parsed["value"]
+        target_ea = ea_resolved
         xref_iter = idautils.DataRefsTo(target_ea) if search_type == "data_ref" else idautils.CodeRefsTo(target_ea, 1)
         for ref_ea in xref_iter:
             if len(matches) >= limit:

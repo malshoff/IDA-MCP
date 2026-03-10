@@ -20,10 +20,10 @@ from _state import forward  # type: ignore
 def register_tools(server: Any) -> None:
     """Register search tools to server."""
 
-    @server.tool(description="Search for patterns in the binary (strings, immediate values, or references).")
+    @server.tool(description="Search for patterns in the binary (immediate values or references). Use find_regex for string search.")
     def find(
-        type: Annotated[str, Field(description="Search type: 'string', 'immediate', 'data_ref', or 'code_ref'")],
-        target: Annotated[str, Field(description="Search target (string, integer value, or address)")],
+        type: Annotated[str, Field(description="Search type: 'immediate', 'data_ref', or 'code_ref'")],
+        target: Annotated[str, Field(description="Search target (integer value or address)")],
         limit: Annotated[int, Field(description="Max matches (default: 100)")] = 100,
         port: Annotated[Optional[int], Field(description="Instance port override")] = None,
         timeout: Annotated[Optional[int], Field(description="Timeout in seconds")] = None,

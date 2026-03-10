@@ -441,10 +441,16 @@ def define_func(
     import ida_ua  # type: ignore
 
     parsed = parse_address(addr)
-    if not parsed["ok"] or parsed["value"] is None:
-        return {"error": f"Cannot resolve address: {addr}"}
+    if parsed["ok"] and parsed["value"] is not None:
+        start_ea = parsed["value"]
+    else:
+        try:
+            start_ea = idaapi.get_name_ea(idaapi.BADADDR, addr)
+            if start_ea == idaapi.BADADDR:
+                return {"error": f"Cannot resolve: {addr}"}
+        except Exception:
+            return {"error": f"Cannot resolve: {addr}"}
 
-    start_ea = parsed["value"]
     end_ea = idaapi.BADADDR
     if end:
         parsed_end = parse_address(end)
@@ -476,11 +482,18 @@ def define_code(
     import ida_ua  # type: ignore
 
     parsed = parse_address(addr)
-    if not parsed["ok"] or parsed["value"] is None:
-        return {"error": f"Cannot resolve address: {addr}"}
+    if parsed["ok"] and parsed["value"] is not None:
+        ea = parsed["value"]
+    else:
+        try:
+            ea = idaapi.get_name_ea(idaapi.BADADDR, addr)
+            if ea == idaapi.BADADDR:
+                return {"error": f"Cannot resolve: {addr}"}
+        except Exception:
+            return {"error": f"Cannot resolve: {addr}"}
 
-    ea = parsed["value"]
     length = ida_ua.create_insn(ea)
     if length > 0:
         return {"addr": hex_addr(ea), "length": length, "ok": True}
     return {"addr": hex_addr(ea), "error": "Failed to create instruction"}
+

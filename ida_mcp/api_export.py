@@ -27,6 +27,20 @@ import ida_lines  # type: ignore
 from . import compat  # type: ignore
 
 
+def _resolve_addr(query: str):
+    """Resolve address from hex string or IDA name. Returns (ea, error_str)."""
+    parsed = parse_address(query)
+    if parsed["ok"] and parsed["value"] is not None:
+        return parsed["value"], None
+    try:
+        ea = idaapi.get_name_ea(idaapi.BADADDR, query)
+        if ea != idaapi.BADADDR:
+            return ea, None
+    except Exception:
+        pass
+    return None, f"Cannot resolve: {query}"
+
+
 # ============================================================================
 # Read Struct
 # ============================================================================
@@ -38,11 +52,9 @@ def read_struct(
     struct_name: Annotated[Optional[str], "Struct type name (auto-detect if omitted)"] = None,
 ) -> dict:
     """Read struct layout with actual memory values at an address."""
-    parsed = parse_address(addr)
-    if not parsed["ok"] or parsed["value"] is None:
-        return {"error": f"Cannot resolve address: {addr}"}
-
-    ea = parsed["value"]
+    ea, err = _resolve_addr(addr)
+    if ea is None:
+        return {"error": err}
 
     # Auto-detect struct type if not provided
     if not struct_name:
@@ -54,8 +66,9 @@ def read_struct(
         return {"error": "No struct specified and could not auto-detect from address"}
 
     # Lookup struct type
+    til = ida_typeinf.get_idati()
     tif = ida_typeinf.tinfo_t()
-    if not tif.get_named_type(None, struct_name):
+    if not tif.get_named_type(til, struct_name):
         return {"error": f"Struct '{struct_name}' not found"}
 
     udt_data = ida_typeinf.udt_type_data_t()
@@ -132,15 +145,22 @@ def search_structs(
     """Search for structures by name substring."""
     results: List[dict] = []
 
+    til = ida_typeinf.get_idati()
+
     try:
-        limit = compat.get_ordinal_limit()
+        limit = ida_typeinf.get_ordinal_limit(til)
     except Exception:
-        # Fallback
-        limit = ida_typeinf.get_ordinal_qty(None) + 1  # type: ignore
+        try:
+            limit = ida_typeinf.get_ordinal_qty(til) + 1
+        except Exception:
+            try:
+                limit = ida_typeinf.get_last_ordinal() + 1
+            except Exception:
+                return {"error": "Cannot determine ordinal limit for this IDA version"}
 
     for ordinal in range(1, limit):
         tif = ida_typeinf.tinfo_t()
-        if tif.get_numbered_type(None, ordinal):
+        if tif.get_numbered_type(til, ordinal):
             type_name = tif.get_type_name()
             if type_name and filter.lower() in type_name.lower():
                 if tif.is_udt():
@@ -213,12 +233,11 @@ def export_funcs(
     results: List[dict] = []
 
     for fn_str in queries:
-        parsed = parse_address(fn_str)
-        if not parsed["ok"] or parsed["value"] is None:
-            results.append({"addr": fn_str, "error": f"Cannot resolve: {fn_str}"})
+        ea, err = _resolve_addr(fn_str)
+        if ea is None:
+            results.append({"addr": fn_str, "error": err})
             continue
 
-        ea = parsed["value"]
         func = idaapi.get_func(ea)
         if not func:
             results.append({"addr": fn_str, "error": "Function not found"})

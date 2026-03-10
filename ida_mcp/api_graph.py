@@ -20,6 +20,21 @@ import ida_name  # type: ignore
 import ida_ua  # type: ignore
 
 
+def _resolve_addr(query: str):
+    """Resolve address from hex string or IDA name. Returns (ea, error_str)."""
+    parsed = parse_address(query)
+    if parsed["ok"] and parsed["value"] is not None:
+        return parsed["value"], None
+    # Fallback: try as IDA symbol name
+    try:
+        ea = idaapi.get_name_ea(idaapi.BADADDR, query)
+        if ea != idaapi.BADADDR:
+            return ea, None
+    except Exception:
+        pass
+    return None, f"Cannot resolve: {query}"
+
+
 # ============================================================================
 # Call Graph
 # ============================================================================
@@ -47,12 +62,11 @@ def callgraph(
     results: List[dict] = []
 
     for root_str in queries:
-        parsed = parse_address(root_str)
-        if not parsed["ok"] or parsed["value"] is None:
-            results.append({"root": root_str, "error": f"Cannot resolve: {root_str}", "nodes": [], "edges": []})
+        ea, err = _resolve_addr(root_str)
+        if ea is None:
+            results.append({"root": root_str, "error": err, "nodes": [], "edges": []})
             continue
 
-        ea = parsed["value"]
         func = idaapi.get_func(ea)
         if not func:
             results.append({"root": root_str, "error": "Function not found", "nodes": [], "edges": []})
@@ -148,12 +162,11 @@ def callees(
     results: List[dict] = []
 
     for fn_str in queries:
-        parsed = parse_address(fn_str)
-        if not parsed["ok"] or parsed["value"] is None:
-            results.append({"addr": fn_str, "callees": None, "error": f"Cannot resolve: {fn_str}"})
+        ea, err = _resolve_addr(fn_str)
+        if ea is None:
+            results.append({"addr": fn_str, "callees": None, "error": err})
             continue
 
-        ea = parsed["value"]
         func = idaapi.get_func(ea)
         if not func:
             results.append({"addr": fn_str, "callees": None, "error": "No function found"})
