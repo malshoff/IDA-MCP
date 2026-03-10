@@ -41,6 +41,7 @@ import proxy_types  # type: ignore
 import proxy_debug  # type: ignore
 import proxy_python  # type: ignore
 import proxy_stack  # type: ignore
+import proxy_sigmaker  # type: ignore
 
 
 # ============================================================================
@@ -77,6 +78,10 @@ server = FastMCP(
 
 栈帧工具:
 - stack_frame, declare_stack, delete_stack
+
+Signature工具:
+- create_sig: 为地址创建唯一的IDA格式签名
+- search_sig: 搜索IDA格式签名的所有匹配
 
 多实例时请先用 list_instances 查看可用实例，再用 select_instance 选择目标。
 """
@@ -136,4 +141,5 @@ proxy_types.register_tools(server)
 proxy_debug.register_tools(server)
 proxy_python.register_tools(server)
 proxy_stack.register_tools(server)
+proxy_sigmaker.register_tools(server)
 

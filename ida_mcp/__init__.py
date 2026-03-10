@@ -22,6 +22,7 @@ API 模块:
     * `api_stack.py`     : 栈帧操作
     * `api_debug.py`     : 调试器控制
     * `api_resources.py` : MCP Resources (ida:// URI)
+    * `api_sigmaker.py`  : Signature creation and searching (sigmaker)
 
 保留模块:
     * `registry.py`  : 多实例协调器 (端口 11337)
@@ -65,6 +66,7 @@ from . import api_stack
 from . import api_debug
 from . import api_python
 from . import api_resources
+from . import api_sigmaker
 
 # 导入协调器模块
 from . import registry
