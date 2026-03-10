@@ -426,3 +426,61 @@ def patch_bytes(
     
     return results
 
+
+# ============================================================================
+# Define Function / Code
+# ============================================================================
+
+@tool
+@idawrite
+def define_func(
+    addr: Annotated[str, "Address to define a function at"],
+    end: Annotated[Optional[str], "End address (default: auto-detect)"] = None,
+) -> dict:
+    """Define function at address. IDA auto-determines bounds unless end address specified."""
+    import ida_ua  # type: ignore
+
+    parsed = parse_address(addr)
+    if not parsed["ok"] or parsed["value"] is None:
+        return {"error": f"Cannot resolve address: {addr}"}
+
+    start_ea = parsed["value"]
+    end_ea = idaapi.BADADDR
+    if end:
+        parsed_end = parse_address(end)
+        if parsed_end["ok"] and parsed_end["value"] is not None:
+            end_ea = parsed_end["value"]
+
+    # Check if already a function
+    existing = idaapi.get_func(start_ea)
+    if existing and existing.start_ea == start_ea:
+        return {"addr": hex_addr(start_ea), "error": "Function already exists at this address"}
+
+    success = ida_funcs.add_func(start_ea, end_ea)
+    if success:
+        func = idaapi.get_func(start_ea)
+        return {
+            "addr": hex_addr(func.start_ea),
+            "end": hex_addr(func.end_ea),
+            "ok": True,
+        }
+    return {"addr": hex_addr(start_ea), "error": "define_func failed"}
+
+
+@tool
+@idawrite
+def define_code(
+    addr: Annotated[str, "Address to convert bytes to code instruction"],
+) -> dict:
+    """Convert bytes to code instruction at address."""
+    import ida_ua  # type: ignore
+
+    parsed = parse_address(addr)
+    if not parsed["ok"] or parsed["value"] is None:
+        return {"error": f"Cannot resolve address: {addr}"}
+
+    ea = parsed["value"]
+    length = ida_ua.create_insn(ea)
+    if length > 0:
+        return {"addr": hex_addr(ea), "length": length, "ok": True}
+    return {"addr": hex_addr(ea), "error": "Failed to create instruction"}

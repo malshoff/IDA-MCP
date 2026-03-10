@@ -23,6 +23,9 @@ API 模块:
     * `api_debug.py`     : 调试器控制
     * `api_resources.py` : MCP Resources (ida:// URI)
     * `api_sigmaker.py`  : Signature creation and searching (sigmaker)
+    * `api_graph.py`     : Call graph traversal and callee analysis
+    * `api_search.py`    : Unified search and regex string search
+    * `api_export.py`    : Struct reading, struct search, function export
 
 保留模块:
     * `registry.py`  : 多实例协调器 (端口 11337)
@@ -67,6 +70,9 @@ from . import api_debug
 from . import api_python
 from . import api_resources
 from . import api_sigmaker
+from . import api_graph
+from . import api_search
+from . import api_export
 
 # 导入协调器模块
 from . import registry

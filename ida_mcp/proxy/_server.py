@@ -42,6 +42,9 @@ import proxy_debug  # type: ignore
 import proxy_python  # type: ignore
 import proxy_stack  # type: ignore
 import proxy_sigmaker  # type: ignore
+import proxy_graph  # type: ignore
+import proxy_search  # type: ignore
+import proxy_export  # type: ignore
 
 
 # ============================================================================
@@ -82,6 +85,21 @@ server = FastMCP(
 Signature工具:
 - create_sig: 为地址创建唯一的IDA格式签名
 - search_sig: 搜索IDA格式签名的所有匹配
+
+图分析工具:
+- callgraph: 构建调用图
+- callees: 获取函数调用的子函数
+
+搜索工具:
+- find: 统一搜索 (字符串/立即数/数据引用/代码引用)
+- find_regex: 正则表达式字符串搜索
+
+导出工具:
+- read_struct: 读取结构体布局和内存值
+- search_structs: 搜索结构体名称
+- export_funcs: 导出函数数据
+- define_func: 定义函数
+- define_code: 转换字节为代码
 
 多实例时请先用 list_instances 查看可用实例，再用 select_instance 选择目标。
 """
@@ -142,4 +160,7 @@ proxy_debug.register_tools(server)
 proxy_python.register_tools(server)
 proxy_stack.register_tools(server)
 proxy_sigmaker.register_tools(server)
+proxy_graph.register_tools(server)
+proxy_search.register_tools(server)
+proxy_export.register_tools(server)
 
